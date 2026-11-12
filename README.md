@@ -81,16 +81,3 @@ db/             migrations, RLS, Postgres functions
 5. Guest screens poll; only display and admin may use realtime.
 6. Every screen handles loading, empty, error and offline.
 7. Nothing tappable under 48px.
-
-## Schedule
-
-| | |
-|---|---|
-| Thu 12 Nov | repo live, everyone running on mocks |
-| Fri 13 Nov | database lands; screens built against mocks |
-| Sat 14 Nov | checkpoint — every screen works on mocks; rebalance |
-| Sun 15 Nov | mocks off, real backend, fix what breaks |
-| Mon 16 Nov | rehearsal, 15–20 people, outdoors at the real spot |
-| Tue 17 Nov | fixes only |
-| Wed 18 Nov | freeze, backup, print stamp cards |
-| Thu 19 Nov | gala |
