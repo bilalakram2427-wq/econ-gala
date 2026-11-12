@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Brand tokens, spec section 15. Mirrored in tailwind.config.ts and lib/config.ts.
+ * Guest and staff screens are ivory on light; display is dark.
+ */
+:root {
+  --ivory: #f3eee5;
+  --bronze: #7a5c2e;
+  --bronze-light: #9a7840;
+  --forest: #14201b;
+  --forest-light: #24352d;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--ivory);
+  color: var(--forest);
+  font-family: var(--font-body), system-ui, sans-serif;
+  /* The game is played standing up, outdoors, one-handed. */
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), Georgia, serif;
+}
+
+/* Never let a tap target fall below 48px: it is dark, people are holding drinks. */
+button,
+[role='button'],
+a.btn {
+  min-height: 48px;
+}
+
+/* Stop iOS zooming the page when a text field is focused. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Font families, loaded via the <link> tags in app/layout.tsx. */
+:root {
+  --font-heading: 'Cormorant Garamond';
+  --font-body: 'Jost';
+}
