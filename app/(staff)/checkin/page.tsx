@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Banner, Button, Card, ErrorNote, Screen } from '@/components/ui';
 import { GuestCard } from '@/components/staff/GuestCard';
 import { poll, staffApi } from '@/lib/api';
@@ -203,6 +204,21 @@ export default function CheckinPage() {
       ) : null}
 
       <ErrorNote error={error} />
+
+      {error?.code === 'UNAUTHENTICATED' ? (
+        <Card className="space-y-3">
+          <p className="text-forest/80">
+            You are not signed in as staff. Sign in with your staff account, then
+            come back to this page.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex min-h-tap items-center font-medium text-bronze underline underline-offset-4"
+          >
+            Go to sign in
+          </Link>
+        </Card>
+      ) : null}
 
       {shown ? (
         <Card className="space-y-5 text-center">
