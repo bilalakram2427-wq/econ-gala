@@ -15,19 +15,18 @@
  *
  * The display polls instead of using realtime. The guide allows either, and an
  * 8-second lag on a leaderboard is not noticeable. All data comes from lib/api.
+ *
+ * Phase and pause come from api.displayStatus, which needs no login. This
+ * laptop is not signed in as an admin.
+ *
+ * No countdown or clock on this screen. That is a team decision (see Bilal's
+ * comment on the pull request), so do not add one back.
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Countdown } from '@/components/ui';
-import { adminApi, api, poll } from '@/lib/api';
+import { api, poll } from '@/lib/api';
 import { GAME, POLL_MS } from '@/lib/config';
 import type { GameState, LeaderboardRow } from '@/lib/types';
-
-/**
- * End of the main round, 6:30 PM Karachi on gala day. This only draws the
- * countdown in the corner. The server decides when the game really ends.
- */
-const GAME_ENDS_AT = '2026-11-19T18:30:00+05:00';
 
 /** No fresh data for this long -> show the reconnecting note. */
 const STALE_AFTER_MS = 20_000;
@@ -78,7 +77,7 @@ export default function DisplayPage() {
   useEffect(
     () =>
       poll(
-        adminApi.overview,
+        api.displayStatus,
         POLL_MS.realtimeFallback,
         (d) => setStatus({ state: d.state, paused: d.paused }),
         () => {},
@@ -118,14 +117,9 @@ export default function DisplayPage() {
   /* -------------------------------------------------------------- render */
 
   const top = (rows ?? []).slice(0, GAME.leaderboardTopN);
-  const showCountdown =
-    status !== null &&
-    !status.paused &&
-    (status.state === 'GAME' || status.state === 'COMEBACK');
-
   return (
     <div className="fixed inset-0 grid cursor-none select-none grid-rows-[auto_1fr] overflow-hidden bg-forest px-[4vw] py-[3vh] text-ivory">
-      {/* Corner: title on the left, phase and countdown on the right. */}
+      {/* Corner: title on the left, phase on the right. */}
       <header className="flex items-baseline justify-between">
         <h1
           className="font-heading font-semibold tracking-[0.2em]"
@@ -138,12 +132,6 @@ export default function DisplayPage() {
           style={{ fontSize: 'clamp(1rem, 3.2vh, 3rem)' }}
         >
           {status ? (status.paused ? 'PAUSED' : PHASE_LABEL[status.state]) : ''}
-          {showCountdown ? (
-            <>
-              {' · '}
-              <Countdown to={GAME_ENDS_AT} />
-            </>
-          ) : null}
         </div>
       </header>
 
