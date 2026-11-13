@@ -436,3 +436,41 @@ $$;
 
 \echo ''
 \echo 'All rule tests passed.'
+
+-- --------------------------------------------------- what anon can reach
+
+-- The display laptop is signed in as nobody. These grants decide whether the
+-- big screen works at all, and a superuser test would pass regardless — so
+-- this block actually becomes the anon role first.
+do $$
+begin
+  set local role anon;
+
+  perform display_status();
+  perform t_ok('       anon can call display_status (the display has no session)');
+
+  perform top10();
+  perform t_ok('       anon can call top10 (the big screen reads the board)');
+
+  begin
+    perform admin_overview();
+    raise exception 'FAIL  anon could call admin_overview';
+  exception when insufficient_privilege then
+    perform t_ok('       anon cannot call admin_overview');
+  end;
+
+  begin
+    perform me();
+    raise exception 'FAIL  anon could call me()';
+  exception when insufficient_privilege then
+    perform t_ok('       anon cannot call me()');
+  end;
+
+  begin
+    perform qr_token(gen_random_uuid(), 1);
+    raise exception 'FAIL  anon could mint a QR token for any guest';
+  exception when insufficient_privilege then
+    perform t_ok('       anon cannot mint a QR token');
+  end;
+end;
+$$;

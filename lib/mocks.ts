@@ -29,7 +29,7 @@
 import { ApiError } from './types';
 import type {
   AdminGuestCounts, AdminGuestRow, AdminLeaderboardRow, AdminOverview, Arrival,
-  ComebackRow, Flag, GameState, GuestCredentials, LeaderboardRow, MeResponse,
+  ComebackRow, DisplayStatus, Flag, GameState, GuestCredentials, LeaderboardRow, MeResponse,
   QrResponse, ScanResponse, StaffCounters, StaffGuest, SubmitRequest,
   SubmitResponse,
 } from './types';
@@ -279,6 +279,16 @@ export async function submit(req: SubmitRequest): Promise<SubmitResponse> {
     submit_by: new Date(
       state.active.startedAt + GAME.submitDeadlineSeconds * 1000,
     ).toISOString(),
+  };
+}
+
+export async function displayStatus(): Promise<DisplayStatus> {
+  await delay(120);
+  return {
+    state: state.gameState,
+    paused: state.paused,
+    round_ends_at: null,
+    server_time: iso(),
   };
 }
 
