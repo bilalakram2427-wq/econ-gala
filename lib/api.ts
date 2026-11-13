@@ -19,9 +19,12 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { USE_MOCKS, normalizeRegNo } from './config';
 import {
   ApiError,
+  type AdminGuestCounts,
+  type AdminGuestRow,
   type AdminLeaderboardRow,
   type AdminOverview,
   type ApiErrorCode,
+  type Arrival,
   type ComebackRow,
   type Flag,
   type GameState,
@@ -191,6 +194,11 @@ export const staffApi = {
   /**
    * Marks the guest checked in and returns their credentials so the volunteer
    * can read them out. Show them for this one guest only.
+   *
+   * Does NOT check payment. The guest card already shows payment_status, and
+   * an unverified guest is sent to whoever handled payment verification —
+   * a human decision at a gate rather than a block on a volunteer's phone.
+   * The status at check-in time goes to the audit log either way.
    */
   checkin: (guestId: string): Promise<GuestCredentials> =>
     USE_MOCKS ? mocks.checkin(guestId) : rpc('checkin', { p_guest_id: guestId }),
@@ -235,6 +243,50 @@ export const adminApi = {
     USE_MOCKS
       ? mocks.ok()
       : rpc('void_connection', { p_connection_id: connectionId, p_reason: reason }),
+
+  /* ------------------------------------------------- the guests panel */
+
+  /**
+   * The whole roster, including guests who never turned up — which is the
+   * point of the screen. Carries email and phone, so it is admin only and
+   * never reaches a guest or the display.
+   */
+  guestList: (q = '', arrival: Arrival | 'all' = 'all'): Promise<AdminGuestRow[]> =>
+    USE_MOCKS
+      ? mocks.adminGuestList(q, arrival)
+      : rpc('admin_guest_list', { p_q: q, p_arrival: arrival }),
+
+  guestCounts: (): Promise<AdminGuestCounts> =>
+    USE_MOCKS ? mocks.adminGuestCounts() : rpc('admin_guest_counts', {}),
+
+  /**
+   * Corrects the payment record. Admin only by design: a volunteer who needs
+   * someone through the gate uses staffApi.checkin(id, true) instead, which
+   * does not touch this field.
+   */
+  setPaymentStatus: (guestId: string, status: string): Promise<{ ok: true }> =>
+    USE_MOCKS
+      ? mocks.setPaymentStatus(guestId, status)
+      : rpc('set_payment_status', { p_guest_id: guestId, p_status: status }),
+
+  /** Organizers play but cannot win. Must be set before GAME starts (R1). */
+  setOrganizer: (guestId: string, isOrganizer: boolean): Promise<{ ok: true }> =>
+    USE_MOCKS
+      ? mocks.setOrganizer(guestId, isOrganizer)
+      : rpc('set_organizer', { p_guest_id: guestId, p_is_organizer: isOrganizer }),
+
+  setDisqualified: (
+    guestId: string,
+    disqualified: boolean,
+    reason = '',
+  ): Promise<{ ok: true }> =>
+    USE_MOCKS
+      ? mocks.setDisqualified(guestId, disqualified)
+      : rpc('set_disqualified', {
+          p_guest_id: guestId,
+          p_disqualified: disqualified,
+          p_reason: reason,
+        }),
 };
 
 /* ------------------------------------------------------------ polling */

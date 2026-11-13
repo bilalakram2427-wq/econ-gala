@@ -113,6 +113,56 @@ afterwards as manual connections. This is the fallback for guests without
 smartphones and for a network outage, and with this timeline it is our safety
 net. Print them on the 18th.
 
+## D11 — Reg numbers come from the roll number column
+
+The registration form asks for the roll number explicitly and labels it "as on
+your student card", and students are told to bring that card to the gate. So
+the roll number is both the identifier and the thing the volunteer verifies
+against.
+
+The email's local part is a fallback for a row whose roll number is missing or
+unusable, since not everyone registers with their university address. A row
+where neither works is rejected at import and listed for manual fixing rather
+than guessed at.
+
+Collisions are detected on the stripped form, so `FA24-BED-010`,
+`fa24-bed 010` and `FA24BED010` are recognised as the same student and the
+second one is refused rather than creating a duplicate account.
+
+## D12 — Payment is checked by a person, not by the software
+
+`checkin()` does not look at `payment_status` at all. Anyone on the guest list
+can be checked in.
+
+The volunteer already sees the payment status on the guest card, and an
+unverified guest is sent to whoever handled payment verification. That is the
+right place for the decision: a hard block would only produce an unexplained
+failure on a volunteer's phone with a queue behind them, and the exception is
+rare enough that a human handles it faster than a UI flow would.
+
+The payment status at the moment of check-in is written to the audit log
+regardless, so anyone let in unverified is still traceable.
+
+Correcting the payment record is an admin action on the guests panel, with
+before and after values logged. Payment is a financial record owned by whoever
+handles the money; a volunteer overwriting it mid-queue would destroy the
+trail for whoever reconciles afterwards.
+
+## D13 — Admin guests panel
+
+Restores the "Guests" page from spec section 16, which was cut during the
+original scoping. It shows the whole roster — including guests who never
+turned up, which the leaderboard cannot — with roll number, email, payment
+status and arrival state, plus search and filters.
+
+Three admin writes live there: payment status, organizer, and disqualify or
+reinstate. Marking organizers has a deadline: they are excluded from prizes
+and the comeback pool, so it has to be set before GAME starts.
+
+Lives at `app/(admin)/admin/guests/page.tsx`. That is inside Meerab's route
+group but is **Bilal's file** — it was added after her task card was written
+and is not part of Task 2.
+
 ---
 
 ## Still open
