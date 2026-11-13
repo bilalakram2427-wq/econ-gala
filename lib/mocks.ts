@@ -28,9 +28,10 @@
 
 import { ApiError } from './types';
 import type {
-  AdminLeaderboardRow, AdminOverview, ComebackRow, Flag, GameState,
-  GuestCredentials, LeaderboardRow, MeResponse, QrResponse, ScanResponse,
-  StaffCounters, StaffGuest, SubmitRequest, SubmitResponse,
+  AdminGuestCounts, AdminGuestRow, AdminLeaderboardRow, AdminOverview, Arrival,
+  ComebackRow, Flag, GameState, GuestCredentials, LeaderboardRow, MeResponse,
+  QrResponse, ScanResponse, StaffCounters, StaffGuest, SubmitRequest,
+  SubmitResponse,
 } from './types';
 import { GAME } from './config';
 
@@ -295,23 +296,48 @@ export async function top10(): Promise<LeaderboardRow[]> {
 
 /* ---------------------------------------------------------------- staff */
 
-const GUESTS: StaffGuest[] = [
-  ['FA24-BED-001', 'Bilal Rehman', 'Bilal R.', true, true],
-  ['FA24-BED-002', 'Hamza Siddiqui', 'Hamza S.', true, false],
-  ['FA24-BED-003', 'Ayesha Khan', 'Ayesha K.', true, true],
-  ['FA24-BED-004', 'Omar Farooq', 'Omar F.', false, false],
-  ['FA24-BED-005', 'Sana Tariq', 'Sana T.', true, true],
-  ['FA24-BED-006', 'Ali Nawaz', 'Ali N.', false, false],
-  ['FA24-BED-999', 'Zara Mir', 'Zara M.', false, false],
-].map(([reg_no, full_name, display_name, ci, oi]) => ({
-  guest_id: `mock-g-${reg_no}`,
-  reg_no: reg_no as string,
-  full_name: full_name as string,
-  display_name: display_name as string,
-  checked_in_at: ci ? iso(-600_000) : null,
-  opted_in_at: oi ? iso(-500_000) : null,
-  payment_status: 'paid',
-}));
+/** reg_no, full name, display name, checked in, opted in, payment status */
+const GUEST_SEED: [string, string, string, boolean, boolean, string][] = [
+  ['FA24-BED-001', 'Bilal Rehman',   'Bilal R.',  true,  true,  'Verified'],
+  ['FA24-BED-002', 'Hamza Siddiqui', 'Hamza S.',  true,  false, 'Verified'],
+  ['FA24-BED-003', 'Ayesha Khan',    'Ayesha K.', true,  true,  'Verified'],
+  ['FA24-BED-004', 'Omar Farooq',    'Omar F.',   false, false, 'Verified'],
+  ['FA24-BED-005', 'Sana Tariq',     'Sana T.',   true,  true,  'Verified'],
+  ['FA24-BED-006', 'Ali Nawaz',      'Ali N.',    false, false, 'Proof submitted'],
+  ['FA26-BED-027', 'Hannan Nazir',   'Hannan N.', false, false, 'Proof submitted'],
+  ['SP26-ECO-071', 'Ayesha Khan',    'Ayesha K.', false, false, 'Verified'],
+  ['FA24-BED-999', 'Zara Mir',       'Zara M.',   false, false, 'Verified'],
+];
+
+const GUESTS: StaffGuest[] = GUEST_SEED.map(
+  ([reg_no, full_name, display_name, ci, oi, pay]) => ({
+    guest_id: `mock-g-${reg_no}`,
+    reg_no,
+    full_name,
+    display_name,
+    checked_in_at: ci ? iso(-600_000) : null,
+    opted_in_at: oi ? iso(-500_000) : null,
+    payment_status: pay,
+  }),
+);
+
+/** Stable per guest, so the same one always reads out the same password. */
+const PASSWORDS: Record<string, string> = Object.fromEntries(
+  GUEST_SEED.map(([reg], i) => [reg, ['k7m2qp', 'r4td9w', 'jx2n7c', 'q8vm3z',
+    'h5kp2r', 'n9wq4t', 'b3zj7m', 'v6cr8x', 'd2pt5k'][i] ?? 'k7m2qp']),
+);
+
+/** Admin-only extras: email, phone, organizer and disqualified flags. */
+const GUEST_EXTRA: Record<string, {
+  email: string; phone: string; organizer: boolean; disqualified: boolean;
+}> = Object.fromEntries(
+  GUEST_SEED.map(([reg], i) => [reg, {
+    email: `${reg.toLowerCase()}@cuilahore.edu.pk`,
+    phone: `0300${String(1234567 + i)}`,
+    organizer: reg === 'FA24-BED-001',
+    disqualified: false,
+  }]),
+);
 
 export async function staffSearch(q: string): Promise<StaffGuest[]> {
   await delay(180);
@@ -327,11 +353,12 @@ export async function staffSearch(q: string): Promise<StaffGuest[]> {
 export async function checkin(guestId: string): Promise<GuestCredentials> {
   await delay(250);
   const guest = GUESTS.find((g) => g.guest_id === guestId);
-  if (guest) guest.checked_in_at = iso();
-  return {
-    reg_no: guest?.reg_no ?? 'FA24-BED-000',
-    password: 'k7m2qp',
-  };
+  if (!guest) throw new ApiError('UNKNOWN_CODE', 'UNKNOWN_CODE');
+
+  // Payment is not checked here, same as the real function. The volunteer sees
+  // payment_status on the card and decides.
+  guest.checked_in_at = guest.checked_in_at ?? iso();
+  return { reg_no: guest.reg_no, password: PASSWORDS[guest.reg_no] ?? 'k7m2qp' };
 }
 
 export async function counters(): Promise<StaffCounters> {
@@ -401,6 +428,84 @@ export async function comebackList(): Promise<ComebackRow[]> {
     score: score as number,
     connections: connections as number,
   }));
+}
+
+/* ------------------------------------------------- admin guests panel */
+
+function arrivalOf(g: StaffGuest): Arrival {
+  if (g.checked_in_at && g.opted_in_at) return 'playing';
+  if (g.checked_in_at) return 'checked_in';
+  return 'not_arrived';
+}
+
+function toAdminRow(g: StaffGuest): AdminGuestRow {
+  const extra = GUEST_EXTRA[g.reg_no];
+  return {
+    guest_id: g.guest_id,
+    reg_no: g.reg_no,
+    full_name: g.full_name,
+    display_name: g.display_name,
+    email: extra?.email ?? null,
+    phone: extra?.phone ?? null,
+    payment_status: g.payment_status,
+    checked_in_at: g.checked_in_at,
+    opted_in_at: g.opted_in_at,
+    is_organizer: extra?.organizer ?? false,
+    disqualified: extra?.disqualified ?? false,
+    arrival: arrivalOf(g),
+    score: g.opted_in_at ? 4 + (g.reg_no.charCodeAt(11) % 9) : 0,
+    connections: g.opted_in_at ? 2 + (g.reg_no.charCodeAt(11) % 5) : 0,
+  };
+}
+
+export async function adminGuestList(
+  q: string,
+  arrival: Arrival | 'all',
+): Promise<AdminGuestRow[]> {
+  await delay(220);
+  const needle = q.trim().toLowerCase();
+  return GUESTS
+    .map(toAdminRow)
+    .filter((r) =>
+      !needle ||
+      r.full_name.toLowerCase().includes(needle) ||
+      r.reg_no.toLowerCase().includes(needle) ||
+      (r.email ?? '').toLowerCase().includes(needle))
+    .filter((r) => arrival === 'all' || r.arrival === arrival)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
+}
+
+export async function adminGuestCounts(): Promise<AdminGuestCounts> {
+  await delay(120);
+  const rows = GUESTS.map(toAdminRow);
+  return {
+    all: rows.length,
+    playing: rows.filter((r) => r.arrival === 'playing').length,
+    checked_in: rows.filter((r) => r.arrival === 'checked_in').length,
+    not_arrived: rows.filter((r) => r.arrival === 'not_arrived').length,
+    unpaid: rows.filter((r) => r.payment_status !== 'Verified').length,
+  };
+}
+
+export async function setPaymentStatus(guestId: string, status: string) {
+  await delay(200);
+  const g = GUESTS.find((x) => x.guest_id === guestId);
+  if (g) g.payment_status = status;
+  return { ok: true as const };
+}
+
+export async function setOrganizer(guestId: string, isOrganizer: boolean) {
+  await delay(200);
+  const g = GUESTS.find((x) => x.guest_id === guestId);
+  if (g && GUEST_EXTRA[g.reg_no]) GUEST_EXTRA[g.reg_no].organizer = isOrganizer;
+  return { ok: true as const };
+}
+
+export async function setDisqualified(guestId: string, disqualified: boolean) {
+  await delay(200);
+  const g = GUESTS.find((x) => x.guest_id === guestId);
+  if (g && GUEST_EXTRA[g.reg_no]) GUEST_EXTRA[g.reg_no].disqualified = disqualified;
+  return { ok: true as const };
 }
 
 export async function flags(): Promise<Flag[]> {

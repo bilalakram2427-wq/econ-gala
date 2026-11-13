@@ -198,6 +198,48 @@ export interface AdminLeaderboardRow extends LeaderboardRow {
 }
 
 /**
+ * Where a guest is in the evening.
+ *   not_arrived  no sign of them
+ *   checked_in   at the venue, has not joined the game yet
+ *   playing      checked in and opted in
+ */
+export type Arrival = 'not_arrived' | 'checked_in' | 'playing';
+
+/**
+ * One row of the admin guests panel. Unlike the leaderboard this covers EVERY
+ * guest, including those who never turned up — seeing who is missing is the
+ * point of that screen.
+ *
+ * Admin only. Email and phone are on this row, so it never reaches a guest or
+ * the display.
+ */
+export interface AdminGuestRow {
+  guest_id: string;
+  reg_no: string;
+  full_name: string;
+  display_name: string;
+  email: string | null;
+  phone: string | null;
+  payment_status: string | null;
+  checked_in_at: string | null;
+  opted_in_at: string | null;
+  is_organizer: boolean;
+  disqualified: boolean;
+  arrival: Arrival;
+  score: number;
+  connections: number;
+}
+
+export interface AdminGuestCounts {
+  all: number;
+  playing: number;
+  checked_in: number;
+  not_arrived: number;
+  /** Anyone whose payment is not 'Verified'. */
+  unpaid: number;
+}
+
+/**
  * The bottom 25% at the COMEBACK snapshot. Admin eyes only — this list is never
  * returned to a guest and never shown on the display.
  */
