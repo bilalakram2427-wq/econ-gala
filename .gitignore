@@ -9,3 +9,7 @@ build/
 *.log
 .vercel
 *.tsbuildinfo
+
+# Guest lists contain names, phones and emails, and this repo is public.
+*.csv
+!db/test/*.csv
