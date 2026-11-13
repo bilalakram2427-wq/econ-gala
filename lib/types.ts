@@ -86,6 +86,23 @@ export interface MeResponse {
   server_time: string; // ISO
 }
 
+/* -------------------------------------------------------- display */
+
+/**
+ * What the big screen is allowed to know. Public — the display laptop has no
+ * session, and must not be given an admin one.
+ *
+ * `round_ends_at` is null until an admin sets it on the night. No countdown is
+ * better than a wrong one, since the game starts when someone presses GAME
+ * rather than at a time decided days earlier.
+ */
+export interface DisplayStatus {
+  state: GameState;
+  paused: boolean;
+  round_ends_at: string | null;
+  server_time: string;
+}
+
 /* ------------------------------------------------------------------ qr */
 
 /** GET /api/qr */

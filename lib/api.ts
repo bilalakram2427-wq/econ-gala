@@ -26,6 +26,7 @@ import {
   type ApiErrorCode,
   type Arrival,
   type ComebackRow,
+  type DisplayStatus,
   type Flag,
   type GameState,
   type GuestCredentials,
@@ -182,6 +183,16 @@ export const api = {
 
   top10: (): Promise<LeaderboardRow[]> =>
     USE_MOCKS ? mocks.top10() : rpc('top10', {}),
+
+  /**
+   * Phase, pause flag and the countdown target. Public: the display screen
+   * runs on an unattended laptop with no session, so it cannot use me() or
+   * adminApi.overview().
+   *
+   * round_ends_at is null until an admin sets it on the night.
+   */
+  displayStatus: (): Promise<DisplayStatus> =>
+    USE_MOCKS ? mocks.displayStatus() : rpc('display_status', {}),
 };
 
 /* --------------------------------------------------------------- staff */
