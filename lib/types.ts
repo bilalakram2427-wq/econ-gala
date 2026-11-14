@@ -277,6 +277,7 @@ export type ApiErrorCode =
   | 'UNAUTHENTICATED'
   | 'BAD_CREDENTIALS'
   | 'NOT_CHECKED_IN'
+  | 'ILLEGAL_TRANSITION'
   | 'NO_ACCOUNT'
   | 'IS_ADMIN'
   | 'PHASE_CLOSED'
@@ -320,6 +321,8 @@ export const ERROR_TEXT: Record<ApiErrorCode, string> = {
   UNAUTHENTICATED: 'Your session ended. Log in again with your reg number.',
   BAD_CREDENTIALS: 'That reg number and password do not match. Check with a volunteer.',
   NOT_CHECKED_IN: 'You are not checked in yet. See you at the gate.',
+  ILLEGAL_TRANSITION:
+    'Phases go in order, one at a time. Set the next one first.',
   NO_ACCOUNT: 'This guest has no login yet. Import the guest list first.',
   IS_ADMIN: 'This person is an admin. Change their role in the database.',
   PHASE_CLOSED: 'The game is not running right now.',

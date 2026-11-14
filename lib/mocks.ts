@@ -398,8 +398,18 @@ export async function overview(): Promise<AdminOverview> {
   };
 }
 
+const PHASE_ORDER: GameState[] = [
+  'SETUP', 'CHECKIN', 'GAME', 'COMEBACK', 'LOCKED', 'VERIFIED', 'REVEALED',
+];
+
 export async function setState(s: GameState) {
   await delay(200);
+  // Mirrors the real set_state: phases go in order, one at a time.
+  const from = PHASE_ORDER.indexOf(state.gameState);
+  const to = PHASE_ORDER.indexOf(s);
+  if (to !== from + 1) {
+    throw new ApiError('ILLEGAL_TRANSITION', `ILLEGAL_TRANSITION|${state.gameState} to ${s}`);
+  }
   state.gameState = s;
   return { state: s };
 }
