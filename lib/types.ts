@@ -242,6 +242,8 @@ export interface AdminGuestRow {
   opted_in_at: string | null;
   is_organizer: boolean;
   disqualified: boolean;
+  /** 'staff', 'admin', or null for most people. */
+  staff_role: 'staff' | 'admin' | null;
   arrival: Arrival;
   score: number;
   connections: number;
@@ -254,6 +256,8 @@ export interface AdminGuestCounts {
   not_arrived: number;
   /** Anyone whose payment is not 'Verified'. */
   unpaid: number;
+  /** How many people can work the gate right now. */
+  staff: number;
 }
 
 /**
@@ -273,6 +277,8 @@ export type ApiErrorCode =
   | 'UNAUTHENTICATED'
   | 'BAD_CREDENTIALS'
   | 'NOT_CHECKED_IN'
+  | 'NO_ACCOUNT'
+  | 'IS_ADMIN'
   | 'PHASE_CLOSED'
   | 'NOT_OPTED_IN'
   | 'DISQUALIFIED'
@@ -314,6 +320,8 @@ export const ERROR_TEXT: Record<ApiErrorCode, string> = {
   UNAUTHENTICATED: 'Your session ended. Log in again with your reg number.',
   BAD_CREDENTIALS: 'That reg number and password do not match. Check with a volunteer.',
   NOT_CHECKED_IN: 'You are not checked in yet. See you at the gate.',
+  NO_ACCOUNT: 'This guest has no login yet. Import the guest list first.',
+  IS_ADMIN: 'This person is an admin. Change their role in the database.',
   PHASE_CLOSED: 'The game is not running right now.',
   NOT_OPTED_IN: 'Tap Join the game first.',
   DISQUALIFIED: 'Your account cannot score. Please find an organizer.',
