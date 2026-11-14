@@ -75,7 +75,7 @@ async function rpc<T>(fn: string, args: Record<string, unknown> = {}): Promise<T
 }
 
 const KNOWN_CODES: ApiErrorCode[] = [
-  'UNAUTHENTICATED', 'BAD_CREDENTIALS', 'NOT_CHECKED_IN', 'PHASE_CLOSED',
+  'UNAUTHENTICATED', 'BAD_CREDENTIALS', 'NOT_CHECKED_IN', 'NO_ACCOUNT', 'IS_ADMIN', 'PHASE_CLOSED',
   'NOT_OPTED_IN', 'DISQUALIFIED', 'UNKNOWN_CODE', 'ALREADY_CONNECTED', 'BUSY',
   'COOLDOWN', 'QR_EXPIRED', 'CONNECTION_EXPIRED', 'INVALID_TEXT', 'TOO_EARLY',
   'RATE_LIMITED',
@@ -271,9 +271,13 @@ export const adminApi = {
     USE_MOCKS ? mocks.adminGuestCounts() : rpc('admin_guest_counts', {}),
 
   /**
-   * Corrects the payment record. Admin only by design: a volunteer who needs
-   * someone through the gate uses staffApi.checkin(id, true) instead, which
-   * does not touch this field.
+   * Corrects the payment record. Admin only by design.
+   *
+   * A volunteer at the gate never changes this: checkin() ignores payment
+   * entirely, and the guest card shows the status so the volunteer can send
+   * an unverified guest to whoever handled payment verification. Payment is a
+   * financial record, and correcting it is a deliberate act with a name
+   * attached to it in the audit log.
    */
   setPaymentStatus: (guestId: string, status: string): Promise<{ ok: true }> =>
     USE_MOCKS
@@ -285,6 +289,19 @@ export const adminApi = {
     USE_MOCKS
       ? mocks.setOrganizer(guestId, isOrganizer)
       : rpc('set_organizer', { p_guest_id: guestId, p_is_organizer: isOrganizer }),
+
+  /**
+   * Hand someone the check-in screen, or take it back. Their guest account is
+   * untouched either way — they keep playing and keep their score.
+   *
+   * Staff only, deliberately. Promoting to admin stays a database job: an
+   * admin can end the game and disqualify people, and that should not be one
+   * mis-tap away on a screen being used in a hurry.
+   */
+  setStaffRole: (guestId: string, isStaff: boolean): Promise<{ ok: true }> =>
+    USE_MOCKS
+      ? mocks.setStaffRole(guestId, isStaff)
+      : rpc('set_staff_role', { p_guest_id: guestId, p_is_staff: isStaff }),
 
   setDisqualified: (
     guestId: string,

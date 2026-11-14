@@ -113,6 +113,11 @@ export default function AdminGuestsPage() {
               {counts.unpaid} unpaid
             </span>
           ) : null}
+          {counts ? (
+            <span className="min-h-tap px-4 inline-flex items-center rounded-xl text-sm bg-bronze/10 text-bronze border-2 border-bronze/30">
+              {counts.staff} on check-in
+            </span>
+          ) : null}
         </div>
 
         <input
@@ -141,6 +146,8 @@ export default function AdminGuestsPage() {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="font-medium text-forest">{g.full_name}</span>
                     <ArrivalPill arrival={g.arrival} />
+                    {g.staff_role === 'admin' ? <Tag tone="bronze">admin</Tag> : null}
+                    {g.staff_role === 'staff' ? <Tag tone="bronze">staff</Tag> : null}
                     {g.is_organizer ? <Tag>organizer</Tag> : null}
                     {g.disqualified ? <Tag tone="red">disqualified</Tag> : null}
                     {g.payment_status !== 'Verified' ? (
@@ -184,6 +191,26 @@ export default function AdminGuestsPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-forest/70 w-28">Gate duty</span>
+                      {g.staff_role === 'admin' ? (
+                        <span className="text-sm text-forest/60">
+                          Admin — change this in the database, not here.
+                        </span>
+                      ) : (
+                        <Button
+                          variant={g.staff_role === 'staff' ? 'secondary' : 'primary'}
+                          busy={busyId === g.guest_id}
+                          onClick={() =>
+                            act(g.guest_id, () =>
+                              adminApi.setStaffRole(g.guest_id, g.staff_role !== 'staff'))
+                          }
+                        >
+                          {g.staff_role === 'staff' ? 'Remove from check-in' : 'Make staff'}
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm text-forest/70 w-28">Flags</span>
                       <Button
                         variant="secondary"
@@ -212,10 +239,12 @@ export default function AdminGuestsPage() {
                     </div>
 
                     <p className="text-xs text-forest/45">
-                      Organizers play but are excluded from prizes and the comeback
-                      pool, so set that before the game starts. Changing payment here
-                      corrects the record; to let an unpaid guest through the gate
-                      without changing it, use the override on the check-in screen.
+                      Making someone staff gives them the check-in screen at /checkin.
+                      Their guest account is untouched — they keep playing and keep
+                      their score. Organizers play but cannot win a prize or enter the
+                      comeback round, so set that before the game starts. Changing
+                      payment here corrects the record; the check-in screen shows the
+                      status but never blocks anyone.
                     </p>
                   </div>
                 ) : null}
@@ -243,10 +272,11 @@ function Tag({
   tone = 'neutral',
 }: {
   children: React.ReactNode;
-  tone?: 'neutral' | 'amber' | 'red';
+  tone?: 'neutral' | 'amber' | 'red' | 'bronze';
 }) {
   const cls = {
     neutral: 'bg-bronze/15 text-bronze',
+    bronze: 'bg-bronze text-ivory',
     amber: 'bg-amber-100 text-amber-900',
     red: 'bg-red-100 text-red-900',
   }[tone];

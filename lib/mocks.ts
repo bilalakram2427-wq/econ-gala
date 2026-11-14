@@ -337,15 +337,20 @@ const PASSWORDS: Record<string, string> = Object.fromEntries(
     'h5kp2r', 'n9wq4t', 'b3zj7m', 'v6cr8x', 'd2pt5k'][i] ?? 'k7m2qp']),
 );
 
-/** Admin-only extras: email, phone, organizer and disqualified flags. */
+/** Admin-only extras: email, phone, organizer, disqualified, staff role. */
 const GUEST_EXTRA: Record<string, {
   email: string; phone: string; organizer: boolean; disqualified: boolean;
+  staffRole: 'staff' | 'admin' | null;
 }> = Object.fromEntries(
   GUEST_SEED.map(([reg], i) => [reg, {
     email: `${reg.toLowerCase()}@cuilahore.edu.pk`,
     phone: `0300${String(1234567 + i)}`,
     organizer: reg === 'FA24-BED-001',
     disqualified: false,
+    // One admin and one existing volunteer, so the panel has something to show.
+    staffRole: reg === 'FA24-BED-001' ? 'admin'
+             : reg === 'FA24-BED-005' ? 'staff'
+             : null,
   }]),
 );
 
@@ -462,6 +467,7 @@ function toAdminRow(g: StaffGuest): AdminGuestRow {
     opted_in_at: g.opted_in_at,
     is_organizer: extra?.organizer ?? false,
     disqualified: extra?.disqualified ?? false,
+    staff_role: extra?.staffRole ?? null,
     arrival: arrivalOf(g),
     score: g.opted_in_at ? 4 + (g.reg_no.charCodeAt(11) % 9) : 0,
     connections: g.opted_in_at ? 2 + (g.reg_no.charCodeAt(11) % 5) : 0,
@@ -494,6 +500,7 @@ export async function adminGuestCounts(): Promise<AdminGuestCounts> {
     checked_in: rows.filter((r) => r.arrival === 'checked_in').length,
     not_arrived: rows.filter((r) => r.arrival === 'not_arrived').length,
     unpaid: rows.filter((r) => r.payment_status !== 'Verified').length,
+    staff: rows.filter((r) => r.staff_role !== null).length,
   };
 }
 
@@ -508,6 +515,17 @@ export async function setOrganizer(guestId: string, isOrganizer: boolean) {
   await delay(200);
   const g = GUESTS.find((x) => x.guest_id === guestId);
   if (g && GUEST_EXTRA[g.reg_no]) GUEST_EXTRA[g.reg_no].organizer = isOrganizer;
+  return { ok: true as const };
+}
+
+export async function setStaffRole(guestId: string, isStaff: boolean) {
+  await delay(220);
+  const g = GUESTS.find((x) => x.guest_id === guestId);
+  if (!g) throw new ApiError('UNKNOWN_CODE', 'UNKNOWN_CODE');
+  const extra = GUEST_EXTRA[g.reg_no];
+  // Mirrors the real function: the button never touches an admin.
+  if (extra?.staffRole === 'admin') throw new ApiError('IS_ADMIN', 'IS_ADMIN');
+  if (extra) extra.staffRole = isStaff ? 'staff' : null;
   return { ok: true as const };
 }
 
