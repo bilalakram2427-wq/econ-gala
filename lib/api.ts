@@ -179,7 +179,9 @@ export const api = {
 
   /** Give up on a pending connection the guest started. */
   cancelPending: (connectionId: string): Promise<{ ok: true }> =>
-    USE_MOCKS ? mocks.ok() : rpc('cancel_pending', { p_connection_id: connectionId }),
+    USE_MOCKS
+      ? mocks.cancelPending(connectionId)
+      : rpc('cancel_pending', { p_connection_id: connectionId }),
 
   top10: (): Promise<LeaderboardRow[]> =>
     USE_MOCKS ? mocks.top10() : rpc('top10', {}),
