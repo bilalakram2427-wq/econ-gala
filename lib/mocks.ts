@@ -139,9 +139,22 @@ export async function optin() {
   return { ok: true as const };
 }
 
+/** Generic "it worked" for calls with nothing to simulate (flags, voids). */
 export async function ok() {
   await delay(120);
-  state.pending = null;
+  return { ok: true as const };
+}
+
+/**
+ * Mirrors cancel_pending() in 003_game_functions.sql: only a pending
+ * connection that matches the id is dropped, and anything else is a quiet
+ * no-op that still returns ok. An active connection is never cancelled here.
+ */
+export async function cancelPending(connectionId: string) {
+  await delay(120);
+  if (state.pending && state.pending.id === connectionId) {
+    state.pending = null;
+  }
   return { ok: true as const };
 }
 
