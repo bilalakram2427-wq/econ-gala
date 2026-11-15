@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 
 import { api, poll } from '@/lib/api';
+import { POLL_MS } from '@/lib/config';
 import { ApiError, ERROR_TEXT, type ActiveConnection, type Vote, type SubmitResponse } from '@/lib/types';
 
 export default function ConversationPage() {
@@ -20,17 +21,21 @@ export default function ConversationPage() {
   const connectionId = params.id as string;
 
   const idempotencyKey = useRef('');
+  const initialConnectionsCount = useRef<number | null>(null);
 
   const [connection, setConnection] = useState<ActiveConnection | null>(null);
   const [learnedText, setLearnedText] = useState('');
   const [vote, setVote] = useState<Vote | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [submitSecondsLeft, setSubmitSecondsLeft] = useState(0);
   const [serverOffset, setServerOffset] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const [completedTotal, setCompletedTotal] = useState<number | null>(null);
   const [result, setResult] = useState<SubmitResponse | null>(null);
   const [error, setError] = useState('');
 
@@ -43,11 +48,15 @@ export default function ConversationPage() {
   useEffect(() => {
     const stopPolling = poll(
       api.me,
-      3000,
+      POLL_MS.guestConversation,
       (data) => {
         setServerOffset(
           new Date(data.server_time).getTime() - Date.now()
         );
+
+        if (initialConnectionsCount.current === null) {
+          initialConnectionsCount.current = data.connections_count;
+        }
 
         if (data.active_connection?.connection_id === connectionId) {
           setConnection(data.active_connection);
@@ -56,8 +65,16 @@ export default function ConversationPage() {
             setSubmitted(true);
           }
         } else if (submitted) {
-          setCompleted(true);
-        } else if (!data.active_connection) {
+          if (
+            initialConnectionsCount.current !== null &&
+            data.connections_count > initialConnectionsCount.current
+          ) {
+            setCompleted(true);
+            setCompletedTotal(data.score);
+          } else {
+            setTimedOut(true);
+          }
+        } else {
           router.push('/');
         }
 
@@ -69,7 +86,7 @@ export default function ConversationPage() {
     return stopPolling;
   }, [connectionId, router, submitted]);
 
-  // Update the countdown every second.
+  // Update the countdowns every second.
   useEffect(() => {
     if (!connection || submitted) return;
 
@@ -83,6 +100,14 @@ export default function ConversationPage() {
       );
 
       setSecondsLeft(Math.max(0, remaining));
+
+      const submitDeadline = new Date(connection.submit_by).getTime();
+
+      const submitRemaining = Math.ceil(
+        (submitDeadline - (Date.now() + serverOffset)) / 1000
+      );
+
+      setSubmitSecondsLeft(Math.max(0, submitRemaining));
     };
 
     updateCountdown();
@@ -149,7 +174,7 @@ export default function ConversationPage() {
             Your conversation has been completed.
           </p>
 
-          {result?.status === 'completed' && (
+          {result?.status === 'completed' ? (
             <>
               <p className="text-forest">
                 Points earned: {result.points_awarded}
@@ -158,7 +183,31 @@ export default function ConversationPage() {
                 Your total: {result.new_total}
               </p>
             </>
-          )}
+          ) : completedTotal !== null ? (
+            <p className="text-forest">
+              Your new total: {completedTotal} points
+            </p>
+          ) : null}
+
+          <Button full onClick={() => router.push('/')}>
+            Back home
+          </Button>
+        </Card>
+      </Screen>
+    );
+  }
+
+  if (timedOut) {
+    return (
+      <Screen title="Conversation ended">
+        <Card className="space-y-4 text-center">
+          <h2 className="font-heading text-2xl text-forest">
+            Time's up
+          </h2>
+
+          <p className="text-forest/70">
+            Your partner didn't submit in time, so no points this time.
+          </p>
 
           <Button full onClick={() => router.push('/')}>
             Back home
@@ -251,6 +300,11 @@ export default function ConversationPage() {
             Minimum chat time completed!
           </p>
         )}
+
+        <p className="text-sm text-forest/60">
+          Submit within {Math.floor(submitSecondsLeft / 60)}:
+          {String(submitSecondsLeft % 60).padStart(2, '0')}
+        </p>
       </Card>
 
       <Card className="space-y-3">
@@ -315,4 +369,3 @@ export default function ConversationPage() {
     </Screen>
   );
 }
-

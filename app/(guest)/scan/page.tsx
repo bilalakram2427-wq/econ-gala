@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'react-qr-code';
 
 import {
   Screen,
@@ -13,7 +14,9 @@ import {
 } from '@/components/ui';
 
 import { api, poll } from '@/lib/api';
-import { ApiError, ERROR_TEXT } from '@/lib/types';
+import { POLL_MS } from '@/lib/config';
+import { secondsUntil } from '@/lib/time';
+import { ApiError, QrResponse } from '@/lib/types';
 
 export default function ScanPage() {
   const router = useRouter();
@@ -23,13 +26,58 @@ export default function ScanPage() {
   const [cancelBusy, setCancelBusy] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [partner, setPartner] = useState('');
   const [pendingConnectionId, setPendingConnectionId] = useState('');
   const [error, setError] = useState<ApiError | null>(null);
   const [message, setMessage] = useState('');
+  const [qr, setQr] = useState<QrResponse | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
   const scannerRef = useRef<{ clear: () => Promise<void> } | null>(null);
   const scannedRef = useRef(false);
+
+  // Restore an existing connection or pending scan after opening this page.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkSession() {
+      try {
+        const data = await api.me();
+
+        if (cancelled) return;
+
+        if (data.active_connection) {
+          router.push(`/c/${data.active_connection.connection_id}`);
+          return;
+        }
+
+        if (data.pending_connection?.i_initiated) {
+          setPartner(data.pending_connection.partner_display_name);
+          setPendingConnectionId(data.pending_connection.connection_id);
+          setWaiting(true);
+        }
+      } catch (err) {
+        if (cancelled) return;
+
+        if (err instanceof ApiError) {
+          setError(err);
+        } else {
+          setMessage('Could not check your connection. Please try again.');
+        }
+      } finally {
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    void checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleScan = useCallback(async (value: string) => {
     if (scannedRef.current) return;
@@ -83,6 +131,7 @@ export default function ScanPage() {
     try {
       await api.cancelPending(pendingConnectionId);
       setWaiting(false);
+      setQr(null);
       router.push('/');
     } catch (err) {
       if (err instanceof ApiError) {
@@ -95,6 +144,7 @@ export default function ScanPage() {
     }
   }
 
+  // Start and stop the camera scanner.
   useEffect(() => {
     if (!cameraOn || waiting) return;
 
@@ -148,17 +198,21 @@ export default function ScanPage() {
     };
   }, [cameraOn, waiting, handleScan]);
 
+  // Check whether the other guest has scanned back.
   useEffect(() => {
     if (!waiting) return;
 
     const stopPolling = poll(
       api.me,
-      3000,
+      POLL_MS.guestPending,
       (data) => {
         if (data.active_connection) {
           router.push(`/c/${data.active_connection.connection_id}`);
         } else if (!data.pending_connection) {
           router.push('/');
+        } else if (data.pending_connection.i_initiated) {
+          setPartner(data.pending_connection.partner_display_name);
+          setPendingConnectionId(data.pending_connection.connection_id);
         }
       },
       (err) => setError(err),
@@ -166,6 +220,60 @@ export default function ScanPage() {
 
     return stopPolling;
   }, [waiting, router]);
+
+  // Fetch and refresh your own QR while waiting.
+  useEffect(() => {
+    if (!waiting) return;
+
+    let cancelled = false;
+
+    async function loadQr() {
+      try {
+        const data = await api.qr();
+
+        if (!cancelled) {
+          setQr(data);
+        }
+      } catch (err) {
+        if (!cancelled && err instanceof ApiError) {
+          setError(err);
+        }
+      }
+    }
+
+    void loadQr();
+
+    const stopPolling = poll(
+      api.qr,
+      POLL_MS.guestHome,
+      (data) => setQr(data),
+      (err) => setError(err),
+    );
+
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, [waiting]);
+
+  // Keep the QR countdown updated.
+  useEffect(() => {
+    if (!qr) return;
+
+    const updateCountdown = () => {
+      setSecondsLeft(secondsUntil(qr.window_ends_at));
+    };
+
+    updateCountdown();
+
+    const timer = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(timer);
+  }, [qr]);
+
+  if (checkingSession) {
+    return <Loading />;
+  }
 
   if (waiting) {
     return (
@@ -179,7 +287,27 @@ export default function ScanPage() {
             Ask them to scan your QR code back.
           </p>
 
-          <Loading />
+          {qr ? (
+            <div className="space-y-3">
+              <div className="mx-auto w-fit rounded-xl bg-white p-4">
+                <QRCode value={qr.token} size={190} />
+              </div>
+
+              <p className="text-sm text-forest/60">
+                Your six-digit code
+              </p>
+
+              <p className="font-heading text-3xl tracking-widest text-forest">
+                {qr.short_code}
+              </p>
+
+              <p className="text-xs text-forest/50">
+                QR refreshes in {secondsLeft}s
+              </p>
+            </div>
+          ) : (
+            <Loading />
+          )}
         </Card>
 
         {error && <ErrorNote error={error} />}
@@ -213,10 +341,13 @@ export default function ScanPage() {
         <div id="qr-reader" />
 
         {!cameraOn && (
-          <Button full onClick={() => {
-            setMessage('');
-            setCameraOn(true);
-          }}>
+          <Button
+            full
+            onClick={() => {
+              setMessage('');
+              setCameraOn(true);
+            }}
+          >
             Open camera
           </Button>
         )}

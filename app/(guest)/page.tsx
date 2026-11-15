@@ -29,6 +29,8 @@ export default function GuestHome() {
 
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const [qr, setQr] = useState<QrResponse | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -56,6 +58,22 @@ export default function GuestHome() {
 
     return () => clearInterval(timer);
   }, [qr]);
+
+  async function handleCancelPending() {
+    if (!me?.pending_connection || cancelBusy) return;
+
+    setCancelBusy(true);
+    setCancelError('');
+
+    try {
+      await api.cancelPending(me.pending_connection.connection_id);
+      await refresh();
+    } catch {
+      setCancelError('Could not cancel the connection. Please try again.');
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   if (loading) return <Loading />;
 
@@ -139,6 +157,87 @@ export default function GuestHome() {
       )}
 
       <ErrorNote error={error} />
+
+      {me.active_connection && (
+        <Card className="space-y-3 border border-bronze/30">
+          <div>
+            <h2 className="font-heading text-xl text-forest">
+              You're talking with {me.active_connection.partner_display_name}
+            </h2>
+
+            <p className="text-sm text-forest/60">
+              Your conversation is still active.
+            </p>
+          </div>
+
+          <Button
+            full
+            onClick={() =>
+              router.push(`/c/${me.active_connection!.connection_id}`)
+            }
+          >
+            Resume conversation
+          </Button>
+        </Card>
+      )}
+
+      {me.pending_connection?.i_initiated && (
+        <Card className="space-y-4 border border-bronze/30 text-center">
+          <div>
+            <h2 className="font-heading text-xl text-forest">
+              Waiting for {me.pending_connection.partner_display_name}
+            </h2>
+
+            <p className="text-sm text-forest/60">
+              Ask them to scan your QR code back.
+            </p>
+          </div>
+
+          {qr ? (
+            <>
+              <div className="mx-auto w-fit rounded-xl bg-white p-4">
+                <QRCode
+                  value={qr.token}
+                  size={220}
+                  level="M"
+                />
+              </div>
+
+              <p className="text-sm text-forest/60">
+                Your personal QR code
+              </p>
+
+              <p className="text-3xl font-semibold tracking-[0.3em] text-forest">
+                {qr.short_code}
+              </p>
+
+              <p className="text-sm text-bronze">
+                QR refreshes in {secondsLeft}s
+              </p>
+            </>
+          ) : (
+            <p className="py-6 text-forest/60">
+              Loading your QR code...
+            </p>
+          )}
+
+          {cancelError && (
+            <p role="alert" className="text-sm text-red-600">
+              {cancelError}
+            </p>
+          )}
+
+          <Button
+            full
+            variant="secondary"
+            busy={cancelBusy}
+            disabled={cancelBusy}
+            onClick={handleCancelPending}
+          >
+            {cancelBusy ? 'Cancelling...' : 'Cancel connection'}
+          </Button>
+        </Card>
+      )}
 
       {me.pending_connection && !me.pending_connection.i_initiated && (
         <Card className="space-y-3 border border-bronze/30">
