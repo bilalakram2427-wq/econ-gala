@@ -12,3 +12,4 @@ export { Card, Stat } from './Card';
 export { Banner, ErrorNote } from './Banner';
 export { Countdown, CountdownRing } from './Countdown';
 export { Screen, CenteredNote, Loading } from './Screen';
+export { TopBar } from './TopBar';

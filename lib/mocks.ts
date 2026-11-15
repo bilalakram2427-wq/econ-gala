@@ -132,6 +132,10 @@ export async function isLoggedIn(): Promise<boolean> {
   return Boolean(state.regNo);
 }
 
+export async function currentRegNo(): Promise<string | null> {
+  return state.regNo || null;
+}
+
 export async function optin() {
   await delay(250);
   state.optedInOverride = true;

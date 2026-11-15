@@ -136,6 +136,19 @@ export const auth = {
     await sb().auth.signOut();
   },
 
+  /**
+   * The reg number this browser is signed in as, or null. Read from the
+   * session already held locally, so it costs no request: safe to call from a
+   * component that mounts on every screen.
+   */
+  async currentRegNo(): Promise<string | null> {
+    if (USE_MOCKS) return mocks.currentRegNo();
+    const { data } = await sb().auth.getSession();
+    const email = data.session?.user?.email;
+    if (!email) return null;
+    return email.split('@')[0].toUpperCase();
+  },
+
   /** True if a session exists in this browser. Says nothing about check-in. */
   async isLoggedIn(): Promise<boolean> {
     if (USE_MOCKS) return mocks.isLoggedIn();
