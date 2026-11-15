@@ -77,8 +77,22 @@ const state = {
   active: null as null | {
     id: string; partner: string; startedAt: number;
     iSubmitted: boolean; partnerSubmitsAt: number;
+    /** Chosen once, like the real server. Re-picking on every poll made them flicker. */
+    starters: string[];
   },
 };
+
+/**
+ * Pending and active connections live in the database in the real app, so a
+ * page refresh does not lose them. In the mock they were plain variables, which
+ * meant every refresh quietly deleted the conversation and made the recovery
+ * screens (resume, waiting, cancel) impossible to test. Keep them in
+ * localStorage with the rest.
+ */
+function persistConnections() {
+  save('pending', state.pending);
+  save('active', state.active);
+}
 
 /** Restore the bits worth keeping across a refresh. */
 function hydrate() {
@@ -87,6 +101,8 @@ function hydrate() {
   state.score = load('score', 6);
   state.connections = load('connections', 4);
   state.optedInOverride = load<boolean | null>('optedIn', null);
+  state.pending = load('pending', null);
+  state.active = load('active', null);
 }
 hydrate();
 
@@ -125,11 +141,18 @@ export async function login(regNo: string, password: string): Promise<void> {
 export async function logout(): Promise<void> {
   await delay(120);
   state.regNo = '';
+  state.pending = null;
+  state.active = null;
   save('regNo', '');
+  persistConnections();
 }
 
 export async function isLoggedIn(): Promise<boolean> {
   return Boolean(state.regNo);
+}
+
+export async function currentRegNo(): Promise<string | null> {
+  return state.regNo || null;
 }
 
 export async function optin() {
@@ -154,6 +177,7 @@ export async function cancelPending(connectionId: string) {
   await delay(120);
   if (state.pending && state.pending.id === connectionId) {
     state.pending = null;
+    persistConnections();
   }
   return { ok: true as const };
 }
@@ -174,6 +198,7 @@ export async function me(): Promise<MeResponse> {
       startedAt: Date.now(),
       iSubmitted: false,
       partnerSubmitsAt: Date.now() + minChat() * 1000 + 12_000,
+      starters: pickStarters(),
     };
     state.pending = null;
   }
@@ -188,6 +213,7 @@ export async function me(): Promise<MeResponse> {
     save('connections', state.connections);
     state.active = null;
   }
+  persistConnections();
 
   return {
     guest_id: 'mock-guest-1',
@@ -202,7 +228,7 @@ export async function me(): Promise<MeResponse> {
     active_connection: state.active && {
       connection_id: state.active.id,
       partner_display_name: state.active.partner,
-      starters: pickStarters(),
+      starters: state.active.starters,
       min_chat_seconds: minChat(),
       started_at: new Date(state.active.startedAt).toISOString(),
       submit_by: new Date(
@@ -262,6 +288,7 @@ export async function scan(code: string): Promise<ScanResponse> {
     expiresAt: Date.now() + GAME.pendingScanTtlSeconds * 1000,
     backAt: scansBack ? Date.now() + 3000 : null,
   };
+  persistConnections();
 
   return {
     status: 'pending',
@@ -287,6 +314,7 @@ export async function submit(req: SubmitRequest): Promise<SubmitResponse> {
   }
 
   state.active.iSubmitted = true;
+  persistConnections();
   return {
     status: 'waiting_partner',
     submit_by: new Date(
