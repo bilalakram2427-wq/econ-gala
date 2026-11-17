@@ -33,13 +33,22 @@ export default function GuestHome() {
   const [cancelError, setCancelError] = useState('');
 
   const [qr, setQr] = useState<QrResponse | null>(null);
+  const [qrError, setQrError] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {
     const stopPolling = poll(
       api.qr,
       POLL_MS.guestHome,
-      (data) => setQr(data),
+      (data) => {
+        setQr(data);
+        setQrError(false);
+      },
+      // Without this the screen says "Loading your QR code..." for ever when
+      // the code cannot be fetched, and the guest has no idea anything is
+      // wrong. poll() swallows network blips on its own, so reaching here
+      // means a real refusal from the server.
+      () => setQrError(true),
     );
 
     return stopPolling;
@@ -217,7 +226,9 @@ export default function GuestHome() {
             </>
           ) : (
             <p className="py-6 text-forest/60">
-              Loading your QR code...
+              {qrError
+                ? "Couldn't load your code. Retrying..."
+                : 'Loading your QR code...'}
             </p>
           )}
 
@@ -261,6 +272,10 @@ export default function GuestHome() {
         </Card>
       )}
 
+      {/* Hidden while a scan of ours is pending, because the waiting card
+          above already shows the same code. Two identical QRs on one screen
+          left guests wondering which one to hold up. */}
+      {!me.pending_connection?.i_initiated && (
       <Card className="flex flex-col items-center gap-4 p-5">
         <h2 className="font-heading text-xl text-forest">
           Your personal QR code
@@ -290,10 +305,13 @@ export default function GuestHome() {
           </>
         ) : (
           <p className="py-12 text-center text-forest/60">
-            Loading your QR code...
+            {qrError
+              ? "Couldn't load your code. Retrying..."
+              : 'Loading your QR code...'}
           </p>
         )}
       </Card>
+      )}
 
       <Card>
         <div className="grid grid-cols-2 gap-4">
