@@ -36,7 +36,13 @@ export default function GuestHome() {
   const [qrError, setQrError] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
 
+  // The code is only useful while scans are accepted. Before the game opens,
+  // fetching it would be 250 phones asking for something nobody can use.
+  const qrUseful = me?.state === 'GAME' || me?.state === 'COMEBACK';
+
   useEffect(() => {
+    if (!qrUseful) return;
+
     const stopPolling = poll(
       api.qr,
       POLL_MS.guestHome,
@@ -52,7 +58,7 @@ export default function GuestHome() {
     );
 
     return stopPolling;
-  }, []);
+  }, [qrUseful]);
 
   useEffect(() => {
     if (!qr) return;
@@ -275,7 +281,20 @@ export default function GuestHome() {
       {/* Hidden while a scan of ours is pending, because the waiting card
           above already shows the same code. Two identical QRs on one screen
           left guests wondering which one to hold up. */}
-      {!me.pending_connection?.i_initiated && (
+      {!playable && (
+        <Card className="space-y-2 p-5 text-center">
+          <h2 className="font-heading text-xl text-forest">
+            Your QR code
+          </h2>
+          <p className="text-forest/60">
+            {me.state === 'CHECKIN' || me.state === 'SETUP'
+              ? 'Your code will appear here when the game starts.'
+              : 'The game is closed, so there is nothing to scan.'}
+          </p>
+        </Card>
+      )}
+
+      {playable && !me.pending_connection?.i_initiated && (
       <Card className="flex flex-col items-center gap-4 p-5">
         <h2 className="font-heading text-xl text-forest">
           Your personal QR code
