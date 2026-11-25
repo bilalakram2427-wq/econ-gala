@@ -1,0 +1,53 @@
+# Keeps the free Supabase project from being paused for inactivity.
+#
+# Free projects are paused after about a week with no activity, which would
+# take the whole app down. Once a day this asks the database for the current
+# game phase, the same harmless public call the big screen makes.
+#
+# It reads only. It changes nothing and needs no secret key: the URL and the
+# publishable key are what every browser already holds. They are stored as
+# repository secrets rather than written here, so the public repo never
+# contains them.
+#
+# If the call fails, this job fails, and GitHub emails the repo owner. That
+# email is the early warning that the project is paused or down.
+#
+# Setup, once: repo Settings > Secrets and variables > Actions > New secret:
+#   SUPABASE_URL       https://<project-ref>.supabase.co
+#   SUPABASE_ANON_KEY  the publishable key (sb_publishable_...)
+# Then Actions > Keep Supabase awake > Run workflow, to test it.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # every day, 03:17 UTC (08:17 in Pakistan)
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ask the database for the game phase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Secrets SUPABASE_URL and SUPABASE_ANON_KEY are not set."
+            exit 1
+          fi
+
+          response=$(curl --fail --silent --show-error --max-time 30 \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/display_status" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+
+          echo "Database answered: $response"
+
+          # A real answer names the phase. Anything else is a failure.
+          echo "$response" | grep -q '"state"'
